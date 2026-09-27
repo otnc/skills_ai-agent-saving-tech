@@ -1,0 +1,10 @@
+import { defineConfig } from "kiritan";
+
+export default defineConfig({
+  locales: { default: "en", list: ["en", "ja"] },
+  // README.md for the default locale and README.ja.md for Japanese, both at the repo root (the template has no {dir} token).
+  naming: { template: "{base}.{locale}.{ext}" },
+  // House style: a blank line inside a GitHub alert is `>` followed by exactly three spaces.
+  markdown: { alertBlankLineSpaces: 3 },
+  sources: [{ glob: "base/README.base.md", strategy: "inline" }],
+});

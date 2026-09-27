@@ -1,0 +1,75 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without a leading "v" (e.g. 0.1.0)'
+        required: true
+
+# These skills aren't published to a registry: "releasing" means tagging the reviewed commit and creating a GitHub Release whose notes are the commit subjects since the previous tag. The skills CLI installs from the default branch, so the release is a record of what changed, not a separate distribution channel.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validate skills, sync state and tests
+        run: |
+          npm run validate
+          npm test
+
+      - name: Check that the generated READMEs are up to date
+        run: npm run docs:verify
+
+      # package.json and every SKILL.md carry the version; a release must not go out with a stale one.
+      - name: Check that the version matches package.json and every SKILL.md
+        run: |
+          WANT="${{ inputs.version }}"
+          HAVE="$(node -p "require('./package.json').version")"
+          [ "$HAVE" = "$WANT" ] || { echo "package.json is $HAVE, expected $WANT"; exit 1; }
+          BAD="$(grep -L "version: \"$WANT\"" skills/*/SKILL.md || true)"
+          [ -z "$BAD" ] || { echo "metadata.version is not $WANT in:"; echo "$BAD"; exit 1; }
+
+      # Computed before the new tag is created, so "the previous tag" can't accidentally resolve to the tag this run is about to make.
+      - name: Build release notes from commits since the previous tag
+        run: |
+          PREV_TAG="$(git tag --sort=-creatordate | head -n1 || true)"
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$PREV_TAG" ]; then
+              git log "${PREV_TAG}..HEAD" --no-merges --pretty=format:'- %s'
+            else
+              git log --no-merges --pretty=format:'- %s'
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Tag
+        run: |
+          TAG="v${{ inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            --title "v${{ inputs.version }}" \
+            --notes-file release-notes.md

@@ -1,0 +1,20 @@
+{
+  "name": "ai-agent-saving-tech",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Agent Skills that cut token use and stretch the usage limits of AI coding agents without lowering output quality.",
+  "license": "MIT",
+  "author": "otoneko.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "sync": "node scripts/sync.mjs",
+    "validate": "node scripts/validate.mjs && node scripts/sync.mjs --check",
+    "docs:build": "kiritan build",
+    "docs:check": "kiritan check",
+    "docs:verify": "kiritan verify"
+  },
+  "devDependencies": {
+    "kiritan": "^0.6.1"
+  }
+}

@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Validate SKILL.md files against the Agent Skills spec
+        run: node scripts/validate.mjs
+
+      # Every skill carries its own copy of the shared files so it works when installed alone; this fails if a copy drifted from shared/.
+      - name: Check that skills are in sync with shared/
+        run: node scripts/sync.mjs --check
+
+      - name: Run audit.mjs test suite
+        run: node --test tests/*.test.mjs
+
+      - name: List skills as the skills CLI sees them
+        if: matrix.node == 22
+        run: npx --yes skills add . --list
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # kiritan needs Node.js 22.7+; the skills themselves only need 18+ (covered by the test job).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check that README.md and README.ja.md match base/README.base.md
+        run: npm run docs:verify
+
+      - name: Check translations for missing or stale sections
+        run: npm run docs:check
